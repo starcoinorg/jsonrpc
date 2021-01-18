@@ -6,25 +6,28 @@ use crate::rpc_attr::path_eq_str;
 const CLIENT_META_WORD: &str = "client";
 const SERVER_META_WORD: &str = "server";
 const PARAMS_META_KEY: &str = "params";
+const SCHEMA_META_WORD: &str = "schema";
 
 #[derive(Debug)]
 pub struct DeriveOptions {
 	pub enable_client: bool,
 	pub enable_server: bool,
+	pub enable_schema: bool,
 	pub params_style: ParamStyle,
 }
 
 impl DeriveOptions {
-	pub fn new(enable_client: bool, enable_server: bool, params_style: ParamStyle) -> Self {
+	pub fn new(enable_client: bool, enable_server: bool, enable_schema: bool, params_style: ParamStyle) -> Self {
 		DeriveOptions {
 			enable_client,
 			enable_server,
+			enable_schema,
 			params_style,
 		}
 	}
 
 	pub fn try_from(args: syn::AttributeArgs) -> Result<Self, syn::Error> {
-		let mut options = DeriveOptions::new(false, false, ParamStyle::default());
+		let mut options = DeriveOptions::new(false, false, false, ParamStyle::default());
 		for arg in args {
 			if let syn::NestedMeta::Meta(meta) = arg {
 				match meta {
@@ -33,13 +36,17 @@ impl DeriveOptions {
 							.get_ident()
 							.ok_or(syn::Error::new_spanned(
 								p,
-								format!("Expecting identifier `{}` or `{}`", CLIENT_META_WORD, SERVER_META_WORD),
+								format!(
+									"Expecting identifier `{}` `{}` or `{}`",
+									CLIENT_META_WORD, SERVER_META_WORD, SCHEMA_META_WORD
+								),
 							))?
 							.to_string()
 							.as_ref()
 						{
 							CLIENT_META_WORD => options.enable_client = true,
 							SERVER_META_WORD => options.enable_server = true,
+							SCHEMA_META_WORD => options.enable_schema = true,
 							_ => {}
 						};
 					}
@@ -57,10 +64,11 @@ impl DeriveOptions {
 				}
 			}
 		}
-		if !options.enable_client && !options.enable_server {
+		if !options.enable_client && !options.enable_server && !options.enable_schema {
 			// if nothing provided default to both
 			options.enable_client = true;
 			options.enable_server = true;
+			options.enable_schema = false;
 		}
 		if options.enable_server && options.params_style == ParamStyle::Named {
 			// This is not allowed at this time

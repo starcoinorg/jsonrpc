@@ -3,7 +3,7 @@ use jsonrpc_core;
 use jsonrpc_core::{BoxFuture, IoHandler, Result};
 use jsonrpc_derive::rpc;
 
-#[rpc]
+#[rpc(client,server)]
 pub trait Rpc<One, Two> {
 	/// Get One type.
 	#[rpc(name = "getOne")]

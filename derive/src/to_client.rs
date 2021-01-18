@@ -44,49 +44,50 @@ pub fn generate_client_module(
 		.unzip();
 	let client_name = crate_name("jsonrpc-core-client")?;
 	let client = quote! {
-		/// The generated client module.
-		pub mod gen_client {
-			use #client_name as _jsonrpc_core_client;
-			use super::*;
-			use _jsonrpc_core::{
-				Call, Error, ErrorCode, Id, MethodCall, Params, Request,
-				Response, Version,
-			};
-			use _jsonrpc_core::serde_json::{self, Value};
-			use _jsonrpc_core_client::futures::{Future, FutureExt, channel::{mpsc, oneshot}};
-			use _jsonrpc_core_client::{RpcChannel, RpcResult, RpcFuture, TypedClient, TypedSubscriptionStream};
+	/// The generated client module.
+	pub mod gen_client {
+		use #client_name as _jsonrpc_core_client;
+		use super::*;
+		use _jsonrpc_core::{
+		Call, Error, ErrorCode, Id, MethodCall, Params, Request,
+		Response, Version,
+		};
+		use _jsonrpc_core::serde_json::{self, Value};
+		use _jsonrpc_core_client::futures::{Future, FutureExt, channel::{mpsc, oneshot}};
+		use _jsonrpc_core_client::{RpcChannel, RpcResult, RpcFuture, TypedClient, TypedSubscriptionStream};
+		use openrpc_rs::document::*;
+		/// The Client.
+		#[derive(Clone)]
+		pub struct Client#generics {
+		inner: TypedClient,
+		#(#markers_decl),*
+		}
 
-			/// The Client.
-			#[derive(Clone)]
-			pub struct Client#generics {
-				inner: TypedClient,
-				#(#markers_decl),*
-			}
-
-			impl#generics Client#generics
-			where
-				#(#where_clause),*
-			{
-				/// Creates a new `Client`.
-				pub fn new(sender: RpcChannel) -> Self {
-					Client {
-						inner: sender.into(),
-						#(#markers_impl),*
-					}
-				}
-
-				#(#client_methods)*
-			}
-
-			impl#generics From<RpcChannel> for Client#generics
-			where
-				#(#where_clause2),*
-			{
-				fn from(channel: RpcChannel) -> Self {
-					Client::new(channel.into())
-				}
+		impl#generics Client#generics
+		where
+		#(#where_clause),*
+		{
+		/// Creates a new `Client`.
+		pub fn new(sender: RpcChannel) -> Self {
+			Client {
+			inner: sender.into(),
+			#(#markers_impl),*
 			}
 		}
+
+		#(#client_methods)*
+
+		}
+
+		impl#generics From<RpcChannel> for Client#generics
+		where
+		#(#where_clause2),*
+		{
+		fn from(channel: RpcChannel) -> Self {
+			Client::new(channel.into())
+		}
+		}
+	}
 	};
 
 	Ok(client)
@@ -94,6 +95,7 @@ pub fn generate_client_module(
 
 fn generate_client_methods(methods: &[MethodRegistration], options: &DeriveOptions) -> Result<Vec<syn::ImplItem>> {
 	let mut client_methods = vec![];
+	let mut schema_methods = vec![];
 	for method in methods {
 		match method {
 			MethodRegistration::Standard { method, .. } => {
@@ -112,12 +114,12 @@ fn generate_client_methods(methods: &[MethodRegistration], options: &DeriveOptio
 					ParamStyle::Named => {
 						quote! {  // use object style serialization with field names taken from the function param names
 							serde_json::json!({
-								#(stringify!(#arg_names): #arg_names,)*
+							#(stringify!(#arg_names): #arg_names,)*
 							})
 						}
 					}
 					ParamStyle::Positional => quote! {  // use tuple style serialization
-						(#(#arg_names,)*)
+					(#(#arg_names,)*)
 					},
 					ParamStyle::Raw => match arg_names.first() {
 						Some(arg_name) => quote! {#arg_name},
@@ -128,12 +130,38 @@ fn generate_client_methods(methods: &[MethodRegistration], options: &DeriveOptio
 				let client_method = syn::parse_quote! {
 					#(#attrs)*
 					pub fn #name(&self, #args) -> impl Future<Output = RpcResult<#returns>> {
-						let args = #args_serialized;
-						self.inner.call_method(#rpc_name, #returns_str, args)
+					let args = #args_serialized;
+					self.inner.call_method(#rpc_name, #returns_str, args)
 					}
 				};
 				client_methods.push(client_method);
+				if options.enable_schema {
+					let args_types = compute_arg_type(&args)?;
+					let arg_schemas = quote! {  {
+					let mut arg_schemas = vec![];
+					#(arg_schemas.push(
+					ContentDescriptorOrReference::new_content_descriptor::<#args_types>(
+						stringify!(#arg_names).to_string(),
+						None,
+					)
+					));*;
+					arg_schemas
+				}
+						};
+					let schema_method = quote! {{
+					let mut method_object = MethodObject::new(#rpc_name.to_string(), None);
+					let returns = ContentDescriptorOrReference::new_content_descriptor::<#returns>(
+					stringify!(#returns).to_string(),
+					None,
+					);
+					method_object.result = returns;
+							method_object.params = #arg_schemas;
+					method_object
+				}};
+					schema_methods.push(schema_method);
+				}
 			}
+
 			MethodRegistration::PubSub {
 				name: subscription,
 				subscribes,
@@ -150,11 +178,11 @@ fn generate_client_methods(methods: &[MethodRegistration], options: &DeriveOptio
 					let subscribe = subscribe.name();
 					let unsubscribe = unsubscribe.name();
 					let client_method = syn::parse_quote!(
-						#(#attrs)*
-						pub fn #name(&self, #args) -> RpcResult<TypedSubscriptionStream<#returns>> {
-							let args_tuple = (#(#arg_names,)*);
-							self.inner.subscribe(#subscribe, args_tuple, #subscription, #unsubscribe, #returns_str)
-						}
+					#(#attrs)*
+					pub fn #name(&self, #args) -> RpcResult<TypedSubscriptionStream<#returns>> {
+						let args_tuple = (#(#arg_names,)*);
+						self.inner.subscribe(#subscribe, args_tuple, #subscription, #unsubscribe, #returns_str)
+					}
 					);
 					client_methods.push(client_method);
 				}
@@ -168,13 +196,25 @@ fn generate_client_methods(methods: &[MethodRegistration], options: &DeriveOptio
 				let client_method = syn::parse_quote! {
 					#(#attrs)*
 					pub fn #name(&self, #args) -> RpcResult<()> {
-						let args_tuple = (#(#arg_names,)*);
-						self.inner.notify(#rpc_name, args_tuple)
+					let args_tuple = (#(#arg_names,)*);
+					self.inner.notify(#rpc_name, args_tuple)
 					}
 				};
 				client_methods.push(client_method);
 			}
 		}
+	}
+	if options.enable_schema {
+		let m = syn::parse_quote! {
+	pub fn gen_schema() -> OpenrpcDocument {
+		let mut document = OpenrpcDocument::default();
+		let args_tuple = [#(#schema_methods,)*];
+		for a in args_tuple.to_vec(){
+		document.add_object_method(a);
+		}
+		document
+	}};
+		client_methods.push(m);
 	}
 	Ok(client_methods)
 }
@@ -207,9 +247,9 @@ fn compute_args(method: &syn::TraitItemMethod) -> Punctuated<syn::FnArg, syn::to
 		};
 		let segments = match &**ty {
 			syn::Type::Path(syn::TypePath {
-				path: syn::Path { ref segments, .. },
-				..
-			}) => segments,
+								path: syn::Path { ref segments, .. },
+								..
+							}) => segments,
 			_ => continue,
 		};
 		let ident = match &segments[0] {
@@ -221,6 +261,19 @@ fn compute_args(method: &syn::TraitItemMethod) -> Punctuated<syn::FnArg, syn::to
 		args.push(arg.to_owned());
 	}
 	args
+}
+
+fn compute_arg_type(args: &Punctuated<syn::FnArg, syn::token::Comma>) -> Result<Vec<syn::Type>> {
+	let mut types = vec![];
+	for arg in args {
+		let ty = match arg {
+			syn::FnArg::Typed(syn::PatType { ty, .. }) => ty,
+			_ => continue,
+		};
+
+		types.push(ty.as_ref().clone());
+	}
+	Ok(types)
 }
 
 fn compute_arg_identifiers(args: &Punctuated<syn::FnArg, syn::token::Comma>) -> Result<Vec<&syn::Ident>> {
@@ -267,9 +320,9 @@ fn compute_returns(method: &syn::TraitItemMethod, returns: &Option<String>) -> R
 fn try_infer_returns(output: &syn::ReturnType) -> Option<syn::Type> {
 	let extract_path_segments = |ty: &syn::Type| match ty {
 		syn::Type::Path(syn::TypePath {
-			path: syn::Path { segments, .. },
-			..
-		}) => Some(segments.clone()),
+							path: syn::Path { segments, .. },
+							..
+						}) => Some(segments.clone()),
 		_ => None,
 	};
 
