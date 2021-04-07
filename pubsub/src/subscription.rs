@@ -16,6 +16,7 @@ use crate::core::{self, BoxFuture};
 
 use crate::handler::{SubscribeRpcMethod, UnsubscribeRpcMethod};
 use crate::types::{PubSubMetadata, SinkResult, SubscriptionId, TransportError, TransportSender};
+use jsonrpc_core::{Id, Output, Value};
 
 lazy_static::lazy_static! {
 	static ref UNSUBSCRIBE_POOL: futures::executor::ThreadPool = futures::executor::ThreadPool::new()
@@ -118,12 +119,9 @@ impl Sink {
 	}
 
 	fn params_to_string(&self, val: core::Params) -> String {
-		let notification = core::Notification {
-			jsonrpc: Some(core::Version::V2),
-			method: self.notification.clone(),
-			params: val,
-		};
-		core::to_string(&notification).expect("Notification serialization never fails.")
+		let out = serde_json::json!(val);
+		let output = Output::from(Ok(out), Id::Num(0), Some(core::Version::V2));
+		core::to_string(&output).expect("Notification serialization never fails")
 	}
 }
 
@@ -516,12 +514,15 @@ mod tests {
 
 	#[derive(Clone)]
 	struct Metadata(Arc<Session>);
+
 	impl core::Metadata for Metadata {}
+
 	impl PubSubMetadata for Metadata {
 		fn session(&self) -> Option<Arc<Session>> {
 			Some(self.0.clone())
 		}
 	}
+
 	impl Default for Metadata {
 		fn default() -> Self {
 			Self(Arc::new(session().0))

@@ -4,6 +4,7 @@ use std::{thread, time};
 use jsonrpc_core::*;
 use jsonrpc_pubsub::{PubSubHandler, Session, Subscriber, SubscriptionId};
 use jsonrpc_tcp_server::{RequestContext, ServerBuilder};
+use std::time::Duration;
 
 /// To test the server:
 ///
@@ -17,10 +18,9 @@ use jsonrpc_tcp_server::{RequestContext, ServerBuilder};
 fn main() {
 	let mut io = PubSubHandler::new(MetaIoHandler::default());
 	io.add_sync_method("say_hello", |_params: Params| Ok(Value::String("hello".to_string())));
-
 	io.add_subscription(
 		"hello",
-		("subscribe_hello", |params: Params, _, subscriber: Subscriber| {
+		("login", |params: Params, _, subscriber: Subscriber| {
 			if params != Params::None {
 				subscriber
 					.reject(Error {
@@ -60,6 +60,6 @@ fn main() {
 	})
 	.start(&"127.0.0.1:3030".parse().unwrap())
 	.expect("Unable to start RPC server");
-
-	server.wait();
+	//server.wait();
+	thread::sleep(Duration::from_secs(1024));
 }
