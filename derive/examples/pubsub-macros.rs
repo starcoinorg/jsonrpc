@@ -6,6 +6,7 @@ use jsonrpc_core::{Error, ErrorCode, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::typed;
 use jsonrpc_pubsub::{PubSubHandler, Session, SubscriptionId};
+use std::time::Duration;
 
 #[rpc]
 pub trait Rpc {
@@ -14,6 +15,7 @@ pub trait Rpc {
 	/// Hello subscription
 	#[pubsub(subscription = "hello", subscribe, name = "hello_subscribe", alias("hello_sub"))]
 	fn subscribe(&self, meta: Self::Metadata, subscriber: typed::Subscriber<String>, param: u64);
+
 
 	/// Unsubscribe from hello subscription.
 	#[pubsub(subscription = "hello", unsubscribe, name = "hello_unsubscribe")]
@@ -83,6 +85,6 @@ fn main() {
 		})
 		.start(&"0.0.0.0:3030".parse().unwrap())
 		.expect("Server must start with no issues");
-
+	std::thread::sleep(Duration::from_secs(1024));
 	server.wait()
 }

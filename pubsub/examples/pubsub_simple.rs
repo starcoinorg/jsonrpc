@@ -33,6 +33,7 @@ fn main() {
 			}
 
 			thread::spawn(move || {
+				println!("fuck");
 				let sink = subscriber.assign_id(SubscriptionId::Number(5)).unwrap();
 				// or subscriber.reject(Error {} );
 				// or drop(subscriber)

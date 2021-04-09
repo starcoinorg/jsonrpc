@@ -73,9 +73,11 @@ where
 	T: serde::de::Deserialize<'a>,
 {
 	if cfg!(feature = "arbitrary_precision") {
+		println!("yes");
 		let val = serde_json::from_str::<Value>(input)?;
 		T::deserialize(val)
 	} else {
+		println!("no");
 		serde_json::from_str::<T>(input)
 	}
 }

@@ -18,10 +18,10 @@ use crate::types::{Call, Output, Request, Response};
 use crate::types::{Error, ErrorCode, Version};
 
 /// A type representing middleware or RPC response before serialization.
-pub type FutureResponse = Pin<Box<dyn Future<Output = Option<Response>> + Send>>;
+pub type FutureResponse = Pin<Box<dyn Future<Output=Option<Response>> + Send>>;
 
 /// A type representing middleware or RPC call output.
-pub type FutureOutput = Pin<Box<dyn Future<Output = Option<Output>> + Send>>;
+pub type FutureOutput = Pin<Box<dyn Future<Output=Option<Output>> + Send>>;
 
 /// A type representing future string response.
 pub type FutureResult<F, G> = future::Map<
@@ -147,32 +147,32 @@ impl<T: Metadata, S: Middleware<T>> MetaIoHandler<T, S> {
 	///
 	/// A backward-compatible wrapper.
 	pub fn add_sync_method<F>(&mut self, name: &str, method: F)
-	where
-		F: RpcMethodSync,
+		where
+			F: RpcMethodSync,
 	{
 		self.add_method(name, move |params| method.call(params))
 	}
 
 	/// Adds new supported asynchronous method.
 	pub fn add_method<F>(&mut self, name: &str, method: F)
-	where
-		F: RpcMethodSimple,
+		where
+			F: RpcMethodSimple,
 	{
 		self.add_method_with_meta(name, move |params, _meta| method.call(params))
 	}
 
 	/// Adds new supported notification
 	pub fn add_notification<F>(&mut self, name: &str, notification: F)
-	where
-		F: RpcNotificationSimple,
+		where
+			F: RpcNotificationSimple,
 	{
 		self.add_notification_with_meta(name, move |params, _meta| notification.execute(params))
 	}
 
 	/// Adds new supported asynchronous method with metadata support.
 	pub fn add_method_with_meta<F>(&mut self, name: &str, method: F)
-	where
-		F: RpcMethod<T>,
+		where
+			F: RpcMethod<T>,
 	{
 		self.methods
 			.insert(name.into(), RemoteProcedure::Method(Arc::new(method)));
@@ -180,8 +180,8 @@ impl<T: Metadata, S: Middleware<T>> MetaIoHandler<T, S> {
 
 	/// Adds new supported notification with metadata support.
 	pub fn add_notification_with_meta<F>(&mut self, name: &str, notification: F)
-	where
-		F: RpcNotification<T>,
+		where
+			F: RpcNotification<T>,
 	{
 		self.methods
 			.insert(name.into(), RemoteProcedure::Notification(Arc::new(notification)));
@@ -189,8 +189,8 @@ impl<T: Metadata, S: Middleware<T>> MetaIoHandler<T, S> {
 
 	/// Extend this `MetaIoHandler` with methods defined elsewhere.
 	pub fn extend_with<F>(&mut self, methods: F)
-	where
-		F: IntoIterator<Item = (String, RemoteProcedure<T>)>,
+		where
+			F: IntoIterator<Item=(String, RemoteProcedure<T>)>,
 	{
 		self.methods.extend(methods)
 	}
@@ -322,7 +322,7 @@ impl<T: Metadata, S: Middleware<T>> MetaIoHandler<T, S> {
 	}
 
 	/// Returns an iterator visiting all methods in arbitrary order.
-	pub fn iter(&self) -> impl Iterator<Item = (&String, &RemoteProcedure<T>)> {
+	pub fn iter(&self) -> impl Iterator<Item=(&String, &RemoteProcedure<T>)> {
 		self.methods.iter()
 	}
 }
@@ -476,7 +476,10 @@ impl<M: Metadata> IoHandlerExtension<M> for IoHandler<M> {
 }
 
 fn read_request(request_str: &str) -> Result<Request, Error> {
-	crate::serde_from_str(request_str).map_err(|_| Error::new(ErrorCode::ParseError))
+	crate::serde_from_str(request_str).map_err(|e| {
+		println!("{}", e);
+		Error::new(ErrorCode::ParseError)
+	})
 }
 
 fn write_response(response: Response) -> String {
@@ -605,8 +608,8 @@ mod tests {
 	#[test]
 	fn test_send_sync() {
 		fn is_send_sync<T>(_obj: T) -> bool
-		where
-			T: Send + Sync,
+			where
+				T: Send + Sync,
 		{
 			true
 		}
