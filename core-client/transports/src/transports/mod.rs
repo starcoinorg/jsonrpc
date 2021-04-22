@@ -42,7 +42,7 @@ impl RequestBuilder {
 	fn single_request(&mut self, method: String, params: Params) -> (Id, String) {
 		let id = self.next_id();
 		let request = jsonrpc_core::Request::Single(Call::MethodCall(MethodCall {
-			jsonrpc: Some(Version::V2),
+			jsonrpc: None,
 			method,
 			params,
 			id: id.clone(),
@@ -197,6 +197,7 @@ mod tests {
 				jsonrpc: Some(Version::V2),
 				id: Id::Num(1),
 				result: 1.into(),
+				error: None
 			}))
 		);
 	}

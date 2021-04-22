@@ -4,6 +4,7 @@ use jsonrpc_core::futures::{self, future, TryFutureExt};
 use jsonrpc_core::{BoxFuture, IoHandler, Result};
 use jsonrpc_core_client::transports::local;
 use jsonrpc_derive::rpc;
+use std::time::Duration;
 
 /// Rpc trait
 #[rpc]
@@ -55,4 +56,5 @@ fn main() {
 	futures::executor::block_on(async move { futures::join!(fut, server) })
 		.0
 		.unwrap();
+	std::thread::sleep(Duration::from_secs(1024));
 }

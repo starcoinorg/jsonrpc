@@ -121,7 +121,6 @@ where
 						codecs::StreamCodec::new(incoming_separator.clone(), outgoing_separator.clone()),
 					)
 					.split();
-
 					// Work around https://github.com/rust-lang/rust/issues/64552 by boxing the stream type
 					let responses: Pin<Box<dyn futures::Stream<Item = io::Result<String>> + Send>> =
 						Box::pin(reader.and_then(move |req| {
@@ -141,11 +140,14 @@ where
 							})
 						}));
 
+					let r = responses.filter(|s| match s {
+						Ok(s) => future::ready(!s.is_empty()),
+						Err(_) => future::ready(true),
+					});
 					let mut peer_message_queue = {
 						let mut channels = channels.lock();
-						channels.insert(peer_addr, sender);
-
-						PeerMessageQueue::new(responses, receiver, peer_addr)
+						channels.insert(peer_addr, sender.clone());
+						PeerMessageQueue::new(r, receiver, peer_addr)
 					};
 
 					let shared_channels = channels.clone();
