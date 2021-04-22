@@ -399,7 +399,7 @@ where
 
 		// Create a request
 		let call = Request::Single(Call::MethodCall(MethodCall {
-			jsonrpc: Some(Version::V2),
+			jsonrpc: None,
 			method,
 			params: Params::None,
 			id: Id::Num(1),
@@ -447,7 +447,7 @@ where
 
 		// Create a request
 		let call = Request::Single(Call::MethodCall(MethodCall {
-			jsonrpc: Some(Version::V2),
+			jsonrpc: None,
 			method: method.into(),
 			params: Params::Array(params),
 			id: Id::Num(1),

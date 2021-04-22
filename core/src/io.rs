@@ -14,8 +14,11 @@ use crate::calls::{
 	Metadata, RemoteProcedure, RpcMethod, RpcMethodSimple, RpcMethodSync, RpcNotification, RpcNotificationSimple,
 };
 use crate::middleware::{self, Middleware};
+use crate::types::response::Output::Success;
 use crate::types::{Call, Output, Request, Response};
 use crate::types::{Error, ErrorCode, Version};
+use serde_json::map::Entry::Vacant;
+use serde_json::Value;
 
 /// A type representing middleware or RPC response before serialization.
 pub type FutureResponse = Pin<Box<dyn Future<Output = Option<Response>> + Send>>;
@@ -207,14 +210,22 @@ impl<T: Metadata, S: Middleware<T>> MetaIoHandler<T, S> {
 	pub fn handle_request(&self, request: &str, meta: T) -> FutureResult<S::Future, S::CallFuture> {
 		use self::future::Either::{Left, Right};
 		fn as_string(response: Option<Response>) -> Option<String> {
-			let res = response.map(write_response);
-			debug!(target: "rpc", "Response: {}.", match res {
-				Some(ref res) => res,
-				None => "None",
-			});
-			res
+			let ret = match response {
+				None => None,
+				Some(r) => {
+					if let Response::Single(Success(c)) = r.clone() {
+						if c.result == Value::Null {
+							None
+						} else {
+							Some(write_response(r))
+						}
+					} else {
+						Some(write_response(r))
+					}
+				}
+			};
+			ret
 		}
-
 		trace!(target: "rpc", "Request: {}.", request);
 		let request = read_request(request);
 		let result = match request {
@@ -271,9 +282,10 @@ impl<T: Metadata, S: Middleware<T>> MetaIoHandler<T, S> {
 			Call::MethodCall(method) => {
 				let params = method.params;
 				let id = method.id;
-				let jsonrpc = method.jsonrpc;
-				let valid_version = self.compatibility.is_version_valid(jsonrpc);
-
+				//let jsonrpc = method.jsonrpc;
+				//let valid_version = self.compatibility.is_version_valid(jsonrpc);
+				let jsonrpc = Some(Version::V2);
+				let valid_version = true;
 				let call_method = |method: &Arc<dyn RpcMethod<T>>| method.call(params, meta);
 
 				let result = match (valid_version, self.methods.get(&method.method)) {

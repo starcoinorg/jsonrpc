@@ -6,6 +6,7 @@ use jsonrpc_core::{Error, ErrorCode, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::typed;
 use jsonrpc_pubsub::{PubSubHandler, Session, SubscriptionId};
+use std::time::Duration;
 
 #[rpc]
 pub trait Rpc {
@@ -81,8 +82,8 @@ fn main() {
 		jsonrpc_tcp_server::ServerBuilder::with_meta_extractor(io, |context: &jsonrpc_tcp_server::RequestContext| {
 			Arc::new(Session::new(context.sender.clone()))
 		})
-		.start(&"0.0.0.0:3030".parse().unwrap())
+		.start(&"0.0.0.0:3031".parse().unwrap())
 		.expect("Server must start with no issues");
-
+	std::thread::sleep(Duration::from_secs(1024));
 	server.wait()
 }

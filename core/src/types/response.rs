@@ -10,9 +10,12 @@ pub struct Success {
 	#[serde(skip_serializing_if = "Option::is_none")]
 	pub jsonrpc: Option<Version>,
 	/// Result
+	#[serde(flatten)]
 	pub result: Value,
 	/// Correlation id
 	pub id: Id,
+	/// error
+	pub error: Option<String>,
 }
 
 /// Unsuccessful response
@@ -43,7 +46,12 @@ impl Output {
 	/// Creates new output given `Result`, `Id` and `Version`.
 	pub fn from(result: CoreResult<Value>, id: Id, jsonrpc: Option<Version>) -> Self {
 		match result {
-			Ok(result) => Output::Success(Success { id, jsonrpc, result }),
+			Ok(result) => Output::Success(Success {
+				id,
+				jsonrpc,
+				result,
+				error: None,
+			}),
 			Err(error) => Output::Failure(Failure { id, jsonrpc, error }),
 		}
 	}
@@ -139,6 +147,7 @@ fn success_output_serialize() {
 		jsonrpc: Some(Version::V2),
 		result: Value::from(1),
 		id: Id::Num(1),
+		error: None,
 	});
 
 	let serialized = serde_json::to_string(&so).unwrap();
@@ -158,7 +167,8 @@ fn success_output_deserialize() {
 		Output::Success(Success {
 			jsonrpc: Some(Version::V2),
 			result: Value::from(1),
-			id: Id::Num(1)
+			id: Id::Num(1),
+			error: None,
 		})
 	);
 }
@@ -209,7 +219,7 @@ fn failure_output_deserialize() {
 		Output::Failure(Failure {
 			jsonrpc: Some(Version::V2),
 			error: Error::parse_error(),
-			id: Id::Num(1)
+			id: Id::Num(1),
 		})
 	);
 }
@@ -227,7 +237,8 @@ fn single_response_deserialize() {
 		Response::Single(Output::Success(Success {
 			jsonrpc: Some(Version::V2),
 			result: Value::from(1),
-			id: Id::Num(1)
+			id: Id::Num(1),
+			error: None,
 		}))
 	);
 }
@@ -246,12 +257,13 @@ fn batch_response_deserialize() {
 			Output::Success(Success {
 				jsonrpc: Some(Version::V2),
 				result: Value::from(1),
-				id: Id::Num(1)
+				id: Id::Num(1),
+				error: None,
 			}),
 			Output::Failure(Failure {
 				jsonrpc: Some(Version::V2),
 				error: Error::parse_error(),
-				id: Id::Num(1)
+				id: Id::Num(1),
 			})
 		])
 	);
