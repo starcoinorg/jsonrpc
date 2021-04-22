@@ -16,6 +16,10 @@ use crate::core::{self, BoxFuture};
 
 use crate::handler::{SubscribeRpcMethod, UnsubscribeRpcMethod};
 use crate::types::{PubSubMetadata, SinkResult, SubscriptionId, TransportError, TransportSender};
+use jsonrpc_core::id::Id::Num;
+use jsonrpc_core::{Id, Output, Params, Value};
+use serde_json::{Map, Number};
+use std::borrow::BorrowMut;
 
 lazy_static::lazy_static! {
 	static ref UNSUBSCRIBE_POOL: futures::executor::ThreadPool = futures::executor::ThreadPool::new()
@@ -108,6 +112,7 @@ impl Drop for Session {
 pub struct Sink {
 	notification: String,
 	transport: TransportSender,
+	id: SubscriptionId,
 }
 
 impl Sink {
@@ -118,12 +123,42 @@ impl Sink {
 	}
 
 	fn params_to_string(&self, val: core::Params) -> String {
-		let notification = core::Notification {
-			jsonrpc: Some(core::Version::V2),
-			method: self.notification.clone(),
-			params: val,
-		};
-		core::to_string(&notification).expect("Notification serialization never fails.")
+		let mut result = serde_json::json!(val.clone());
+		let mut custom = false;
+		if let Value::Object(o) = result.borrow_mut() {
+			if let Some(p) = o.get_mut("result") {
+				if let Value::Object(s) = p {
+					if s.len() == 4 {
+						s.remove("login");
+						custom = true
+					}
+				}
+			}
+		}
+		if custom {
+			let id = match self.id {
+				SubscriptionId::Number(id) => id,
+				SubscriptionId::String(_) => 0,
+			};
+			let output = Output::from(Ok(result), Num(id), Some(core::Version::V2));
+			core::to_string(&output).expect("Notification serialization never fails")
+		} else {
+			let mut vals = Params::None;
+			let mut result = serde_json::json!(val.clone());
+			if let Value::Object(o) = result.borrow_mut() {
+				if let Some(p) = o.get("result") {
+					if let Some(j) = p.get("job") {
+						vals = Params::Map(j.as_object().unwrap().clone());
+					}
+				}
+			}
+			let notification = core::Notification {
+				jsonrpc: Some(core::Version::V2),
+				method: self.notification.clone(),
+				params: vals,
+			};
+			core::to_string(&notification).expect("Notification serialization never fails.")
+		}
 	}
 }
 
@@ -190,10 +225,11 @@ impl Subscriber {
 			sender,
 		} = self;
 		sender
-			.send(Ok(id))
+			.send(Ok(id.clone()))
 			.map(|_| Sink {
 				notification,
 				transport,
+				id,
 			})
 			.map_err(|_| ())
 	}
@@ -208,9 +244,10 @@ impl Subscriber {
 			transport,
 			sender,
 		} = self;
-		sender.send_and_wait(Ok(id)).map_ok(|_| Sink {
+		sender.send_and_wait(Ok(id.clone())).map_ok(|_| Sink {
 			notification,
 			transport,
+			id,
 		})
 	}
 
@@ -308,7 +345,7 @@ where
 									let _ = f.await;
 								});
 							});
-							Ok(id.into())
+							Ok(Value::Null)
 						}
 						Err(e) => Err(e),
 					})
@@ -516,12 +553,15 @@ mod tests {
 
 	#[derive(Clone)]
 	struct Metadata(Arc<Session>);
+
 	impl core::Metadata for Metadata {}
+
 	impl PubSubMetadata for Metadata {
 		fn session(&self) -> Option<Arc<Session>> {
 			Some(self.0.clone())
 		}
 	}
+
 	impl Default for Metadata {
 		fn default() -> Self {
 			Self(Arc::new(session().0))

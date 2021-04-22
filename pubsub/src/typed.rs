@@ -10,6 +10,7 @@ use serde;
 use crate::core::futures::task::{Context, Poll};
 use crate::core::futures::{self, channel};
 use crate::core::{self, Error, Params, Value};
+use jsonrpc_core::types::id::Id::Num;
 
 /// New PUB-SUB subscriber.
 #[derive(Debug)]
@@ -98,17 +99,13 @@ impl<T: serde::Serialize, E: serde::Serialize> Sink<T, E> {
 	}
 
 	fn val_to_params(&self, val: Result<T, E>) -> Params {
-		let id = self.id.clone().into();
+		//let id = self.id.clone().into();
 		let val = val.map(Self::to_value).map_err(Self::to_value);
-
 		Params::Map(
-			vec![
-				("subscription".to_owned(), id),
-				match val {
-					Ok(val) => ("result".to_owned(), val),
-					Err(err) => ("error".to_owned(), err),
-				},
-			]
+			vec![match val {
+				Ok(val) => ("result".to_owned(), val),
+				Err(err) => ("error".to_owned(), err),
+			}]
 			.into_iter()
 			.collect(),
 		)
