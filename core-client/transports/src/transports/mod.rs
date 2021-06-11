@@ -13,6 +13,8 @@ pub mod http;
 #[cfg(feature = "ipc")]
 pub mod ipc;
 pub mod local;
+#[cfg(feature = "tcp")]
+pub mod tcp;
 #[cfg(feature = "ws")]
 pub mod ws;
 

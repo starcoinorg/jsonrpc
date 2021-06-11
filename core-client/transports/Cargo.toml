@@ -19,7 +19,7 @@ categories = [
 ]
 
 [features]
-default = ["http", "tls", "ws"]
+default = ["http", "tls", "ws", "ipc","tcp"]
 tls = ["hyper-tls", "http"]
 http = ["hyper", "tokio/full"]
 ws = [
@@ -29,6 +29,11 @@ ws = [
 ]
 ipc = [
 	"parity-tokio-ipc",
+	"jsonrpc-server-utils",
+	"tokio",
+]
+
+tcp = [
 	"jsonrpc-server-utils",
 	"tokio",
 ]
@@ -48,13 +53,15 @@ hyper = { version = "0.13", optional = true }
 hyper-tls = { version = "0.4", optional = true }
 jsonrpc-server-utils = { version = "17.1", path = "../../server-utils", optional = true }
 parity-tokio-ipc = { version = "0.8", optional = true }
-tokio = { version = "0.2", optional = true }
+tokio = { version = "0.2", optional = true, features = ["tcp"] }
 websocket = { version = "0.24", optional = true }
 
 [dev-dependencies]
 assert_matches = "1.1"
 jsonrpc-http-server = { version = "17.1", path = "../../http" }
 jsonrpc-ipc-server = { version = "17.1", path = "../../ipc" }
+jsonrpc-tcp-server = { version = "17.1", path = "../../tcp" }
+
 lazy_static = "1.0"
 env_logger = "0.7"
 

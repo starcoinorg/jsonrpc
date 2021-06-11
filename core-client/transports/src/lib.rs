@@ -180,7 +180,7 @@ impl<T: DeserializeOwned + Unpin + 'static> Stream for TypedSubscriptionStream<T
 			None => None,
 			Some(Err(err)) => Some(Err(err.into())),
 		}
-		.into()
+			.into()
 	}
 }
 
@@ -196,7 +196,7 @@ impl From<RpcChannel> for RawClient {
 
 impl RawClient {
 	/// Call RPC method with raw JSON.
-	pub fn call_method(&self, method: &str, params: Params) -> impl Future<Output = RpcResult<Value>> {
+	pub fn call_method(&self, method: &str, params: Params) -> impl Future<Output=RpcResult<Value>> {
 		let (sender, receiver) = oneshot::channel();
 		let msg = CallMessage {
 			method: method.into(),
@@ -271,7 +271,7 @@ impl TypedClient {
 		method: &str,
 		returns: &str,
 		args: T,
-	) -> impl Future<Output = RpcResult<R>> {
+	) -> impl Future<Output=RpcResult<R>> {
 		let returns = returns.to_owned();
 		let args =
 			serde_json::to_value(args).expect("Only types with infallible serialisation can be used for JSON-RPC");
@@ -304,7 +304,7 @@ impl TypedClient {
 			_ => {
 				return Err(RpcError::Client(
 					"RPC params should serialize to a JSON array, or null".into(),
-				))
+				));
 			}
 		};
 
@@ -326,10 +326,11 @@ impl TypedClient {
 		let params = match args {
 			Value::Array(vec) => Params::Array(vec),
 			Value::Null => Params::None,
+			Value::Object(obj) => Params::Map(obj),
 			_ => {
 				return Err(RpcError::Client(
 					"RPC params should serialize to a JSON array, or null".into(),
-				))
+				));
 			}
 		};
 
@@ -360,12 +361,12 @@ mod tests {
 	}
 
 	impl AddClient {
-		fn add(&self, a: u64, b: u64) -> impl Future<Output = RpcResult<u64>> {
+		fn add(&self, a: u64, b: u64) -> impl Future<Output=RpcResult<u64>> {
 			self.0.call_method("add", "u64", (a, b))
 		}
 
 		fn completed(&self, success: bool) -> RpcResult<()> {
-			self.0.notify("completed", (success,))
+			self.0.notify("completed", (success, ))
 		}
 	}
 
@@ -400,7 +401,7 @@ mod tests {
 		let (tx, rx) = std::sync::mpsc::sync_channel(1);
 		let mut handler = IoHandler::new();
 		handler.add_notification("completed", move |params: Params| {
-			let (success,) = params.parse::<(bool,)>().expect("expected to receive one boolean");
+			let (success, ) = params.parse::<(bool, )>().expect("expected to receive one boolean");
 			assert_eq!(success, true);
 			tx.send(()).unwrap();
 		});
@@ -455,7 +456,7 @@ mod tests {
 		let r2 = received.clone();
 		let fut = async move {
 			let mut stream =
-				client.subscribe::<_, (u32,)>("subscribe_hello", (), "hello", "unsubscribe_hello", "u32")?;
+				client.subscribe::<_, (u32, )>("subscribe_hello", (), "hello", "unsubscribe_hello", "u32")?;
 			let result = stream.next().await;
 			r2.lock().unwrap().push(result.expect("Expected at least one item."));
 			tx.send(()).unwrap();
