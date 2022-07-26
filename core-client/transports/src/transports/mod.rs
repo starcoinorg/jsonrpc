@@ -8,11 +8,12 @@ use serde_json::Value;
 use crate::{CallMessage, NotifyMessage, RpcError};
 
 pub mod duplex;
+pub mod local;
+
 #[cfg(feature = "http")]
 pub mod http;
 #[cfg(feature = "ipc")]
 pub mod ipc;
-pub mod local;
 #[cfg(feature = "tcp")]
 pub mod tcp;
 #[cfg(feature = "ws")]
@@ -153,7 +154,7 @@ impl From<ClientResponse> for Result<Value, Error> {
 						(Some(_), _, Some(error)) => {
 							let error = serde_json::from_value::<Error>(error.to_owned())
 								.ok()
-								.unwrap_or_else(|| Error::parse_error());
+								.unwrap_or_else(Error::parse_error);
 							Err(error)
 						}
 						_ => Ok(n.params.into()),

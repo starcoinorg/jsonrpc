@@ -7,6 +7,7 @@ use tower_service::Service as _;
 
 use crate::futures::{self, future};
 use crate::jsonrpc::{middleware, MetaIoHandler, Metadata, Middleware};
+use crate::server_utils::tokio_stream::wrappers::TcpListenerStream;
 use crate::server_utils::{codecs, reactor, tokio, tokio_util::codec::Framed, SuspendableStream};
 
 use crate::dispatch::{Dispatcher, PeerMessageQueue, SenderChannels};
@@ -94,6 +95,7 @@ where
 		executor.executor().spawn(async move {
 			let start = async {
 				let listener = tokio::net::TcpListener::bind(&address).await?;
+				let listener = TcpListenerStream::new(listener);
 				let connections = SuspendableStream::new(listener);
 
 				let server = connections.map(|socket| {
@@ -166,7 +168,7 @@ where
 			match start.await {
 				Ok(server) => {
 					tx.send(Ok(())).expect("Rx is blocking parent thread.");
-					let server = server.buffer_unordered(1024).for_each(|_| async { () });
+					let server = server.buffer_unordered(1024).for_each(|_| async {});
 
 					future::select(Box::pin(server), stop_rx).await;
 				}

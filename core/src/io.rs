@@ -8,7 +8,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use futures_util::{self, future, FutureExt};
-use serde_json;
 
 use crate::calls::{
 	Metadata, RemoteProcedure, RpcMethod, RpcMethodSimple, RpcMethodSync, RpcNotification, RpcNotificationSimple,
@@ -17,7 +16,6 @@ use crate::middleware::{self, Middleware};
 use crate::types::response::Output::Success;
 use crate::types::{Call, Output, Request, Response};
 use crate::types::{Error, ErrorCode, Version};
-use serde_json::map::Entry::Vacant;
 use serde_json::Value;
 
 /// A type representing middleware or RPC response before serialization.
@@ -63,10 +61,10 @@ impl Default for Compatibility {
 
 impl Compatibility {
 	fn is_version_valid(self, version: Option<Version>) -> bool {
-		match (self, version) {
-			(Compatibility::V1, None) | (Compatibility::V2, Some(Version::V2)) | (Compatibility::Both, _) => true,
-			_ => false,
-		}
+		matches!(
+			(self, version),
+			(Compatibility::V1, None) | (Compatibility::V2, Some(Version::V2)) | (Compatibility::Both, _)
+		)
 	}
 
 	fn default_version(self) -> Option<Version> {
@@ -248,7 +246,7 @@ impl<T: Metadata, S: Middleware<T>> MetaIoHandler<T, S> {
 		}
 
 		fn outputs_as_batch(outs: Vec<Option<Output>>) -> Option<Response> {
-			let outs: Vec<_> = outs.into_iter().filter_map(|v| v).collect();
+			let outs: Vec<_> = outs.into_iter().flatten().collect();
 			if outs.is_empty() {
 				None
 			} else {
