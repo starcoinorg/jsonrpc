@@ -27,7 +27,7 @@ pub use jsonrpc_core;
 
 #[macro_use]
 extern crate log;
-
+mod timeout;
 mod handler;
 mod response;
 #[cfg(test)]
@@ -41,6 +41,7 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::{mpsc, Arc, Weak};
 use std::thread;
+use std::time::Duration;
 
 use parking_lot::Mutex;
 
@@ -247,6 +248,7 @@ pub struct ServerBuilder<M: jsonrpc::Metadata = (), S: jsonrpc::Middleware<M> = 
 	keep_alive: bool,
 	threads: usize,
 	max_request_body_size: usize,
+	timeout: Duration,
 }
 
 impl<M: jsonrpc::Metadata + Default, S: jsonrpc::Middleware<M>> ServerBuilder<M, S>
@@ -298,6 +300,7 @@ where
 			keep_alive: true,
 			threads: 1,
 			max_request_body_size: 5 * 1024 * 1024,
+			timeout: Duration::from_secs(6),
 		}
 	}
 
@@ -440,6 +443,7 @@ where
 		let (done_tx, done_rx) = oneshot::channel();
 		let eloop = self.executor.init_with_name("http.worker0")?;
 		let req_max_size = self.max_request_body_size;
+		let timeout=self.timeout;
 		// The first threads `Executor` is initialised differently from the others
 		serve(
 			(shutdown_signal, local_addr_tx, done_tx),
@@ -456,6 +460,7 @@ where
 			keep_alive,
 			reuse_port,
 			req_max_size,
+			timeout,
 		);
 		let handles = (0..self.threads - 1)
 			.map(|i| {
@@ -478,6 +483,7 @@ where
 					keep_alive,
 					reuse_port,
 					req_max_size,
+					timeout,
 				);
 				Ok((eloop, close, local_addr_rx, done_rx))
 			})
@@ -536,6 +542,7 @@ fn serve<M: jsonrpc::Metadata, S: jsonrpc::Middleware<M>>(
 	keep_alive: bool,
 	reuse_port: bool,
 	max_request_body_size: usize,
+	timeout: Duration,
 ) where
 	S::Future: Unpin,
 	S::CallFuture: Unpin,
@@ -617,8 +624,10 @@ fn serve<M: jsonrpc::Metadata, S: jsonrpc::Middleware<M>>(
 				health_api.clone(),
 				max_request_body_size,
 				keep_alive,
+				timeout,
 			);
-			async { Ok::<_, Infallible>(service) }
+			let timeout_service = timeout::Timeout::new(service, timeout);
+			async { Ok::<_, Infallible>(timeout_service) }
 		});
 
 		let server = server_builder.serve(service_fn).with_graceful_shutdown(async {

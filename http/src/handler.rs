@@ -5,6 +5,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{self, Poll};
 use std::{fmt, mem, str};
+use std::time::Duration;
 
 use hyper::header::{self, HeaderMap, HeaderValue};
 use hyper::{self, service::Service, Body, Method};
@@ -28,6 +29,7 @@ pub struct ServerHandler<M: Metadata = (), S: Middleware<M> = middleware::Noop> 
 	health_api: Option<(String, String)>,
 	max_request_body_size: usize,
 	keep_alive: bool,
+	timeout: Duration,
 }
 
 impl<M: Metadata, S: Middleware<M>> ServerHandler<M, S> {
@@ -43,6 +45,7 @@ impl<M: Metadata, S: Middleware<M>> ServerHandler<M, S> {
 		health_api: Option<(String, String)>,
 		max_request_body_size: usize,
 		keep_alive: bool,
+		timeout: Duration,
 	) -> Self {
 		ServerHandler {
 			jsonrpc_handler,
@@ -55,6 +58,7 @@ impl<M: Metadata, S: Middleware<M>> ServerHandler<M, S> {
 			health_api,
 			max_request_body_size,
 			keep_alive,
+			timeout,
 		}
 	}
 }
