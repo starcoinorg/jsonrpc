@@ -140,7 +140,7 @@ impl Sink {
 				SubscriptionId::Number(id) => id,
 				SubscriptionId::String(_) => 0,
 			};
-			let output = Output::from(Ok(result), Num(id), Some(core::Version::V2));
+			let output = Output::from(Ok(result), Num(1), Some(core::Version::V2));
 			core::to_string(&output).expect("Notification serialization never fails")
 		} else {
 			let mut vals = Params::None;
